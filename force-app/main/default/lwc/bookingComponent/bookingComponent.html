@@ -167,188 +167,120 @@
             </template>
 
             <!-- ================= STEP 3 : PAYMENT ================= -->
-            <template if:true={isStep3}>
-                <div class="card-section slds-box slds-theme_shade">
-                    <h3 class="section-title">Payment Details</h3>
+<template if:true={isStep3}>
+    <div class="card-section slds-box slds-theme_shade">
+        <h3 class="section-title">Payment Details</h3>
 
-                    <div class="slds-grid slds-gutters slds-wrap">
-                        <div class="slds-col slds-size_1-of-2">
-                            <lightning-combobox
-                                label="Payment Mode"
-                                value={paymentMode}
-                                options={paymentModeOptions}
-                                onchange={handlePaymentModeChange}
-                                placeholder="Select mode"
-                                required>
-                            </lightning-combobox>
-                        </div>
-                        <div class="slds-col slds-size_1-of-2">
-                            <lightning-combobox
-                                label="Purpose"
-                                value={purpose}
-                                options={purposeOptions}
-                                onchange={handleFieldChange}
-                                data-field="purpose"
-                                placeholder="Select purpose">
-                            </lightning-combobox>
-                        </div>
-                        <div class="slds-col slds-size_1-of-2 slds-m-top_small">
-                            <lightning-input
-                                type="number"
-                                label="Amount"
-                                value={amount}
-                                onchange={handleFieldChange}
-                                data-field="amount"
-                                formatter="currency"
-                                step="0.01"
-                                required>
-                            </lightning-input>
-                        </div>
+        <div class="slds-grid slds-gutters slds-wrap">
+
+            <!-- Payment Mode -->
+            <div class="slds-col slds-size_1-of-2">
+                <lightning-combobox
+                    label="Payment Mode"
+                    value={paymentMode}
+                    options={paymentModeOptions}
+                    onchange={handlePaymentModeChange}
+                    placeholder="Select mode"
+                    required>
+                </lightning-combobox>
+            </div>
+
+            <!-- Purpose -->
+            <div class="slds-col slds-size_1-of-2">
+                <lightning-combobox
+                    label="Purpose"
+                    value={purpose}
+                    options={purposeOptions}
+                    onchange={handleFieldChange}
+                    data-field="purpose"
+                    placeholder="Select purpose">
+                </lightning-combobox>
+            </div>
+
+            <!-- Amount -->
+            <div class="slds-col slds-size_1-of-2 slds-m-top_small">
+                <lightning-input
+                    type="number"
+                    label="Amount"
+                    value={amount}
+                    onchange={handleFieldChange}
+                    data-field="amount"
+                    formatter="currency"
+                    step="0.01"
+                    required>
+                </lightning-input>
+            </div>
+
+        </div>
+
+        <!-- ===== CHEQUE ONLY ===== -->
+        <template if:true={isCheque}>
+            <div class="mode-section">
+
+                <div class="mode-badge">
+                    Cheque Details
+                </div>
+
+                <div class="slds-grid slds-gutters slds-wrap">
+
+                    <div class="slds-col slds-size_1-of-2">
+                        <lightning-input
+                            label="Cheque Number"
+                            data-field="chequeNumber"
+                            onchange={handleFieldChange}>
+                        </lightning-input>
                     </div>
 
-                    <!-- ===== CREDIT CARD ===== -->
-                    <template if:true={isCreditCard}>
-                        <div class="mode-section">
-                            <div class="mode-badge">Credit Card</div>
-                            <div class="slds-grid slds-gutters slds-wrap">
-                                <div class="slds-col slds-size_1-of-2">
-                                    <lightning-input label="Name on Card" data-field="nameOnCard" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2">
-                                    <lightning-combobox label="Card Type" value={cardType} options={cardTypeOptions} data-field="cardType" onchange={handleFieldChange}></lightning-combobox>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-input type="number" label="Card Last 4 Digits" max="9999" data-field="cardLast4" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-input label="Expiry (MM/YY)" maxlength="5" placeholder="MM/YY" data-field="cardExpiry" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-input label="Card Issuing Bank" data-field="cardIssuingBank" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-combobox label="Installments" value={installments} options={installmentOptions} data-field="installments" onchange={handleFieldChange}></lightning-combobox>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-input label="Authorization Code" data-field="authCode" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
+                    <div class="slds-col slds-size_1-of-2">
+                        <lightning-combobox
+                            label="Bank Name"
+                            value={bankName}
+                            options={bankNameOptions}
+                            data-field="bankName"
+                            onchange={handleFieldChange}>
+                        </lightning-combobox>
+                    </div>
 
-                    <!-- ===== CHEQUE ===== -->
-                    <template if:true={isCheque}>
-                        <div class="mode-section">
-                            <div class="mode-badge">Cheque</div>
-                            <div class="slds-grid slds-gutters slds-wrap">
-                                <div class="slds-col slds-size_1-of-2">
-                                    <lightning-input label="Cheque Number" data-field="chequeNumber" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2">
-                                    <lightning-combobox label="Bank Name" value={bankName} options={bankNameOptions} data-field="bankName" onchange={handleFieldChange}></lightning-combobox>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-input type="date" label="Cheque Date" data-field="chequeDate" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-input type="date" label="Cheque Clearance Date" data-field="chequeClearanceDate" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-combobox label="Cheque Status" value={chequeStatus} options={chequeStatusOptions} data-field="chequeStatus" onchange={handleFieldChange}></lightning-combobox>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
+                    <div class="slds-col slds-size_1-of-2 slds-m-top_small">
+                        <lightning-input
+                            label="Branch"
+                            data-field="branch"
+                            onchange={handleFieldChange}>
+                        </lightning-input>
+                    </div>
 
-                    <!-- ===== CASH ===== -->
-                    <template if:true={isCash}>
-                        <div class="mode-section">
-                            <div class="mode-badge">Cash</div>
-                            <div class="slds-grid slds-gutters slds-wrap">
-                                <div class="slds-col slds-size_1-of-2">
-                                    <lightning-input label="Receipt Sent" data-field="receiptSent" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2">
-                                    <lightning-input type="date" label="Date Acknowledged" data-field="dateAcknowledged" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-
-                    <!-- ===== BANK TRANSFER ===== -->
-                    <template if:true={isBankTransfer}>
-                        <div class="mode-section">
-                            <div class="mode-badge">Bank Transfer</div>
-                            <div class="slds-grid slds-gutters slds-wrap">
-                                <div class="slds-col slds-size_1-of-2">
-                                    <lightning-input label="Sender Account Name" data-field="senderAccountName" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2">
-                                    <lightning-input label="Bank Reference Number" data-field="bankRefNumber" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-input label="Transfer Reference / UTR" data-field="transferUTR" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-input type="date" label="Transfer Date" data-field="transferDate" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-input label="Bank Name" data-field="bankNameText" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
-
-                    <!-- ===== WIRE TRANSFER ===== -->
-                    <template if:true={isWireTransfer}>
-                        <div class="mode-section">
-                            <div class="mode-badge wire">Wire Transfer</div>
-                            <div class="wire-note slds-m-bottom_small">
-                                <lightning-icon icon-name="utility:info" size="x-small"></lightning-icon>
-                                On success you'll be redirected to the secure payment gateway.
-                            </div>
-                            <div class="slds-grid slds-gutters slds-wrap">
-                                <!-- <div class="slds-col slds-size_1-of-2">
-                                    <lightning-input label="Sender Account Name" Value = "Skyline Heights" data-field="senderAccountName" onchange={handleFieldChange}></lightning-input>
-                                </div> -->
-                                <div class="slds-col slds-size_1-of-2">
-                                    <lightning-input label="Sender Account Name" value="Skyline Heights" data-field="senderAccountName" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2">
-                                    <lightning-input label="Swift Code / IBAN" data-field="swiftIban" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <!-- <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-input label="Transfer Reference / UTR" data-field="transferUTR" onchange={handleFieldChange}></lightning-input>
-                                </div> -->
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-input type="date" label="Transfer Date" data-field="transferDate" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                                <div class="slds-col slds-size_1-of-2 slds-m-top_x-small">
-                                    <lightning-input label="Bank Name" data-field="bankNameText" onchange={handleFieldChange}></lightning-input>
-                                </div>
-                            </div>
-                        </div>
-                    </template>
+                    <div class="slds-col slds-size_1-of-2 slds-m-top_small">
+                        <lightning-input
+                            type="date"
+                            label="Cheque Date"
+                            data-field="chequeDate"
+                            onchange={handleFieldChange}>
+                        </lightning-input>
+                    </div>
 
                 </div>
 
-                <div class="footer-actions slds-m-top_medium">
-                    <lightning-button
-                        label="Back"
-                        variant="neutral"
-                        icon-name="utility:back"
-                        onclick={handleBack}
-                        class="slds-m-right_small">
-                    </lightning-button>
-                    <lightning-button
-                        label="Save & Pay"
-                        variant="brand"
-                        icon-name="utility:money"
-                        onclick={handleSave}
-                        disabled={isSaving}>
-                    </lightning-button>
-                </div>
-            </template>
+            </div>
+        </template>
+
+    </div>
+
+    <div class="footer-actions slds-m-top_medium">
+        <lightning-button
+            label="Back"
+            variant="neutral"
+            icon-name="utility:back"
+            onclick={handleBack}
+            class="slds-m-right_small">
+        </lightning-button>
+
+        <lightning-button
+            label="Save"
+            variant="brand"
+            onclick={handleSave}>
+        </lightning-button>
+    </div>
+</template>
 
             <!-- Spinner -->
             <template if:true={isSaving}>

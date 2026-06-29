@@ -6,8 +6,8 @@
     "**/.sfdx": true
   },
   "workbench.colorCustomizations": {
-    "statusBar.background": "#8c1004",
-    "activityBar.background": "#8c1004"
+    "statusBar.background": "#2f53a8",
+    "activityBar.background": "#2f53a8"
   },
   "xml.preferences.showSchemaDocumentationType": "none"
 }

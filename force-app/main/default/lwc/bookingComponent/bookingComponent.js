@@ -291,10 +291,6 @@ export default class BookingComponent extends LightningElement {
             this.isSaving = false;
             this.showToast('Success', 'Booking & Payment created successfully', 'success');
 
-            if (this.paymentMode === 'Wire Transfer' && paymentResult && paymentResult.paymentId) {
-                const url = DUMMY_WIRE_URL;
-                window.open(url, '_blank');
-            }
             this.dispatchEvent(new CloseActionScreenEvent());
         })
         .catch(error => {
