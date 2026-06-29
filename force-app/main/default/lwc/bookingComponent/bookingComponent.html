@@ -11,12 +11,12 @@
                 <div class="connector"></div>
                 <div class={step2Class}>
                     <div class="circle">2</div>
-                    <span class="step-label">Booking</span>
+                    <span class="step-label">Select Inventory</span>
                 </div>
                 <div class="connector"></div>
                 <div class={step3Class}>
                     <div class="circle">3</div>
-                    <span class="step-label">Ownership</span>
+                    <span class="step-label">Joint Owners</span>
                 </div>
                 <div class="connector"></div>
                 <div class={step4Class}>
@@ -37,10 +37,10 @@
                         onsuccess={handleAccountSave}
                         onerror={handleFormError}
                         data-type="account">
-                        <div class="slds-grid slds-gutters slds-wrap">
-                            <template for:each={accountFields} for:item="field">
-                                <div key={field} class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
-                                    <lightning-input-field field-name={field}></lightning-input-field>
+                        <div class="field-grid">
+                            <template for:each={accountFieldObjects} for:item="fieldObj">
+                                <div key={fieldObj.name} class="field-grid-item" style={fieldObj.gridStyle}>
+                                    <lightning-input-field field-name={fieldObj.name}></lightning-input-field>
                                 </div>
                             </template>
                         </div>
@@ -56,9 +56,9 @@
                         onsuccess={handleOpportunitySave}
                         onerror={handleFormError}
                         data-type="opportunity">
-                        <div class="slds-grid slds-gutters slds-wrap">
+                        <div class="field-grid">
                             <template for:each={opportunityFieldObjects} for:item="fieldObj">
-                                <div key={fieldObj.name} class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
+                                <div key={fieldObj.name} class={fieldObj.gridClass} style={fieldObj.gridStyle}>
                                     <lightning-input-field
                                         field-name={fieldObj.name}
                                         disabled={fieldObj.disabled}>
@@ -89,67 +89,49 @@
             <!-- ================= STEP 2 : BOOKING / INVENTORY ================= -->
             <template if:true={isStep2}>
                 <div class="card-section slds-box slds-theme_shade">
+                    <h3 class="section-title">Select Inventory Units</h3>
 
-                    <!-- Sub-view 1: Inventory Selection -->
-                    <template if:true={showInventorySelection}>
-                        <h3 class="section-title">Select Inventory</h3>
+                    <template if:true={hasInventoryUnits}>
+                        <lightning-combobox
+                            label="Inventory"
+                            placeholder="Select inventory"
+                            value={selectedInventoryId}
+                            options={inventoryOptions}
+                            onchange={handleInventoryChange}
+                            required>
+                        </lightning-combobox>
+                    </template>
 
-                        <template if:true={hasInventoryUnits}>
-                            <lightning-datatable
-                                data-id="inventory-table"
-                                key-field="Id"
-                                data={inventoryUnits}
-                                columns={inventoryColumns}
-                                onrowselection={handleInventoryRowSelection}>
-                            </lightning-datatable>
-                        </template>
+                    <template if:true={noInventoryUnitsFound}>
+                        <p>No inventory units found for this opportunity's account.</p>
+                    </template>
 
-                        <template if:true={noInventoryUnitsFound}>
-                            <p>No inventory units found for this opportunity's account.</p>
-                        </template>
-
-                        <template if:true={inventoryError}>
-                            <div class="slds-text-color_error slds-m-top_medium">
-                                An error occurred: {inventoryError.body.message}
-                            </div>
-                        </template>
-
-                        <div class="slds-m-top_medium">
-                            <lightning-button
-                                label="Create Bookings"
-                                variant="brand"
-                                onclick={handleCreateBookings}
-                                disabled={disableCreateBookingsButton}>
-                            </lightning-button>
+                    <template if:true={inventoryError}>
+                        <div class="slds-text-color_error slds-m-top_medium">
+                            An error occurred: {inventoryError.body.message}
                         </div>
                     </template>
 
-                    <!-- Sub-view 2: Payment Plan Details -->
-                    <template if:false={showInventorySelection}>
-                        <h3 class="section-title">Payment Plan Details</h3>
+                   <template if:true={showPaymentPlanSection}>
 
-                        <template if:true={paymentPlanDetails.length}>
-                            <lightning-datatable
-                                key-field="Id"
-                                data={paymentPlanDetails}
-                                columns={paymentPlanColumns}
-                                hide-checkbox-column>
-                            </lightning-datatable>
-                        </template>
+                    <h3 class="section-title slds-m-top_large">
+                        Payment Plan Details
+                    </h3>
 
-                        <template if:true={noPaymentPlansFound}>
-                            <p>No default payment plan details found for the selected inventory.</p>
-                        </template>
-
-                        <div class="slds-m-top_medium">
-                            <lightning-button
-                                label="Back to Inventory Selection"
-                                variant="neutral"
-                                icon-name="utility:back"
-                                onclick={handleBackToInventorySelection}>
-                            </lightning-button>
-                        </div>
+                    <template if:true={paymentPlanDetails.length}>
+                        <lightning-datatable
+                            key-field="Id"
+                            data={paymentPlanDetails}
+                            columns={paymentPlanColumns}
+                            hide-checkbox-column>
+                        </lightning-datatable>
                     </template>
+
+                    <template if:true={noPaymentPlansFound}>
+                        <p>No default payment plan details found for the selected inventory.</p>
+                    </template>
+
+                </template>
 
                 </div>
 

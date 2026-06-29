@@ -55,6 +55,42 @@
     border: 1px solid #ebe9e7;
     background: #fafaf9;
 }
+
+/* step 1: account & opportunity field grid. Placement (grid-column/grid-row)
+   is computed per-field in JS and applied via inline style, so fields always
+   pack left-to-right, top-to-bottom in fixed pairs regardless of how tall an
+   individual field renders (e.g. a lookup vs. a date input) — this avoids
+   CSS auto-placement pushing a field into an unexpected row/column. */
+.field-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    column-gap: 16px;
+    row-gap: 14px;
+    align-items: start;
+}
+@media (min-width: 768px) {
+    .field-grid {
+        grid-template-columns: 1fr 1fr;
+        grid-auto-rows: min-content;
+    }
+}
+.field-grid-item {
+    min-width: 0;
+}
+.field-grid-item-full {
+    grid-column: 1 / -1 !important;
+}
+/* safety net: if any field in this grid is a Long Text Area, lightning-input-field
+   renders a multi-row textarea by default. Cap it to a normal input height so a
+   single oversized box doesn't blow out row alignment for the rest of the grid. */
+.field-grid-item textarea {
+    min-height: 32px;
+    max-height: 32px;
+    resize: none;
+    overflow-y: hidden;
+    padding-top: 6px;
+}
+
 .section-title {
     font-size: 15px;
     font-weight: 700;

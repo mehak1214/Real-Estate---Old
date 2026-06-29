@@ -1,9 +1,7 @@
 import { LightningElement, api, wire } from 'lwc';
-import getInventoryUnits from '@salesforce/apex/SelectUnitScreenController.getUnits';
-import createBookingUnits from '@salesforce/apex/SelectUnitScreenController.createBookingUnits';
-import getPaymentPlanDetails from '@salesforce/apex/SelectUnitScreenController.getPaymentPlanDetails';
-import createUnitPayment from '@salesforce/apex/BookingController.createUnitPayment';
-import createJointOwners from '@salesforce/apex/BookingController.createJointOwners';
+import getInventoryUnits from '@salesforce/apex/BookingController.getInventoryUnits';
+import getPaymentPlanDetails from '@salesforce/apex/BookingController.getPaymentPlanDetails';
+import finalizeBookingFlow from '@salesforce/apex/BookingController.finalizeBookingFlow';
 import getAccountAndOpportunity from '@salesforce/apex/BookUnitController.getAccountAndOpportunity';
 import searchAccounts from '@salesforce/apex/BookingController.searchAccounts';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
@@ -13,10 +11,6 @@ import ACCOUNT_OBJECT from '@salesforce/schema/Account';
 import ACCOUNT_NAME_FIELD from '@salesforce/schema/Account.Name';
 import ACCOUNT_PHONE_FIELD from '@salesforce/schema/Account.Phone';
 import OPPORTUNITY_NAME from '@salesforce/schema/Opportunity.Name';
-
-const INVENTORY_COLUMNS = [
-    { label: 'Inventory Name', fieldName: 'Name' }
-];
 
 const PAYMENT_PLAN_COLUMNS = [
     { label: 'Name', fieldName: 'Name' },
@@ -50,13 +44,12 @@ export default class BookingComponent extends LightningElement {
 
     // booking - inventory selection (Step 2)
     inventoryUnits = [];
-    inventoryColumns = INVENTORY_COLUMNS;
+    selectedInventoryId;
     selectedInventoryIds = [];
     isInventoryLoading = false;
     inventoryError;
 
-    // booking - payment plan details (shown after Create Bookings)
-    showInventorySelection = true;
+    // booking - payment plan details (read only)
     paymentPlanDetails = [];
     paymentPlanColumns = PAYMENT_PLAN_COLUMNS;
 
@@ -114,11 +107,16 @@ export default class BookingComponent extends LightningElement {
     get noInventoryUnitsFound() {
         return !this.isInventoryLoading && this.inventoryUnits.length === 0 && !this.inventoryError;
     }
-    get noPaymentPlansFound() {
-        return !this.isInventoryLoading && this.paymentPlanDetails.length === 0;
+    get inventoryOptions() {
+        return this.inventoryUnits.map(unit => ({
+            label: unit.Name,
+            value: unit.Id
+        }));
     }
-    get disableCreateBookingsButton() {
-        return this.isInventoryLoading || this.selectedInventoryIds.length === 0;
+    get noPaymentPlansFound() {
+        return !this.isInventoryLoading &&
+            this.selectedInventoryIds.length > 0 &&
+            this.paymentPlanDetails.length === 0;
     }
     get hasJointOwners()     { return this.jointOwners.length > 0; }
 
@@ -147,10 +145,19 @@ export default class BookingComponent extends LightningElement {
         }
     }
 
-    get opportunityFieldObjects() {
-        return this.opportunityFields.map(f => ({
+    get accountFieldObjects() {
+        return this.accountFields.map((f, i) => ({
             name: f,
-            disabled: f === 'AccountId'
+            gridStyle: `grid-column:${(i % 2) + 1}; grid-row:${Math.floor(i / 2) + 1};`
+        }));
+    }
+
+    get opportunityFieldObjects() {
+        return this.opportunityFields.map((f, i) => ({
+            name: f,
+            disabled: f === 'AccountId',
+            gridClass: 'field-grid-item',
+            gridStyle: `grid-column:${(i % 2) + 1}; grid-row:${Math.floor(i / 2) + 1};`
         }));
     }
 
@@ -199,6 +206,9 @@ export default class BookingComponent extends LightningElement {
     loadInventoryUnits() {
         if (!this.accountId) {
             this.inventoryUnits = [];
+            this.selectedInventoryId = null;
+            this.selectedInventoryIds = [];
+            this.paymentPlanDetails = [];
             return;
         }
         this.isInventoryLoading = true;
@@ -207,6 +217,9 @@ export default class BookingComponent extends LightningElement {
         getInventoryUnits({ accountId: this.accountId })
             .then(data => {
                 this.inventoryUnits = data;
+                this.selectedInventoryId = null;
+                this.selectedInventoryIds = [];
+                this.paymentPlanDetails = [];
                 this.inventoryError = undefined;
             })
             .catch(error => {
@@ -220,55 +233,41 @@ export default class BookingComponent extends LightningElement {
             });
     }
 
-    handleInventoryRowSelection(event) {
-        const selectedRows = event.detail?.selectedRows || [];
-        if (selectedRows.length > 10) {
-            this.showToast('Selection Limit Exceeded', 'You can only select a maximum of 10 units at a time.', 'error');
+    get showPaymentPlanSection() {
+    return this.selectedInventoryIds.length > 0;
+}
 
-            // Revert selection in the datatable UI
-            const datatable = this.template.querySelector('lightning-datatable[data-id="inventory-table"]');
-            if (datatable) datatable.selectedRows = [...this.selectedInventoryIds];
-
+    handleInventoryChange(event) {
+        this.selectedInventoryId = event.detail.value;
+        if (!this.selectedInventoryId) {
+            this.selectedInventoryIds = [];
+            this.paymentPlanDetails = [];
             return;
         }
-        this.selectedInventoryIds = selectedRows.map(row => row.Id);
+        this.selectedInventoryIds = [this.selectedInventoryId];
+        this.loadPaymentPlanDetails();
     }
 
-    handleCreateBookings() {
-        if (this.selectedInventoryIds.length === 0) {
-            this.showToast('Warning', 'Please select at least one inventory unit.', 'warning');
-            return;
-        }
-
+    loadPaymentPlanDetails() {
         this.isInventoryLoading = true;
         this.inventoryError = undefined;
 
-        createBookingUnits({
-            opportunityId: this.recordId,
-            selectedInventoryIds: this.selectedInventoryIds
-        })
-            .then(result => {
-                this.showToast('Success', result, 'success');
-                return getPaymentPlanDetails({ selectedInventoryIds: this.selectedInventoryIds });
-            })
+        getPaymentPlanDetails({ selectedInventoryIds: this.selectedInventoryIds })
             .then(ppdResult => {
                 this.paymentPlanDetails = ppdResult.map(row => ({
                     ...row,
                     percentDisplay: row.Percent__c / 100
                 }));
-                this.showInventorySelection = false;
-                this.isInventoryLoading = false;
             })
             .catch(error => {
-                this.isInventoryLoading = false;
                 this.inventoryError = error;
-                const msg = error?.body?.message || 'Something went wrong while creating bookings';
-                this.showToast('Error', msg, 'error');
+                this.paymentPlanDetails = [];
+                const msg = error?.body?.message || 'Failed to load payment plan details';
+                this.showToast('Error Loading Payment Plan', msg, 'error');
+            })
+            .finally(() => {
+                this.isInventoryLoading = false;
             });
-    }
-
-    handleBackToInventorySelection() {
-        this.showInventorySelection = true;
     }
 
     /* ============ JOINT OWNER HANDLERS ============ */
@@ -430,8 +429,8 @@ export default class BookingComponent extends LightningElement {
     /* ============ STEP NAV ============ */
     handleNext() {
         if (this.currentStep === 2) {
-            if (this.selectedInventoryIds.length === 0 || this.showInventorySelection) {
-                this.showToast('Error', 'Please select inventory unit(s) and click Create Bookings before continuing', 'error');
+            if (this.selectedInventoryIds.length === 0) {
+                this.showToast('Error', 'Please select an inventory unit before continuing', 'error');
                 return;
             }
         } else if (this.currentStep === 3) {
@@ -480,32 +479,29 @@ export default class BookingComponent extends LightningElement {
             this.showToast('Error', 'Please enter Payment Mode and Amount', 'error');
             return;
         }
+        if (this.selectedInventoryIds.length === 0) {
+            this.showToast('Error', 'Please select an inventory unit in Step 2', 'error');
+            return;
+        }
         this.isSaving = true;
 
         const jointOwnerPayload = this.jointOwners.map(owner => ({
-            Account__c:     owner.accountId,
-            Share__c:       Number(owner.share),
-            Booking__c:     this.recordId
+            accountId: owner.accountId,
+            share: Number(owner.share)
         }));
 
-        const promises = [
-            createUnitPayment({
-                opportunityId: this.recordId,
-                paymentMode:   this.paymentMode,
-                purpose:       this.purpose,
-                amount:        this.amount,
-                fieldsJson:    JSON.stringify(this.payFields)
-            })
-        ];
-
-        if (jointOwnerPayload.length > 0) {
-            promises.push(createJointOwners({ jointOwners: jointOwnerPayload }));
-        }
-
-        Promise.all(promises)
+        finalizeBookingFlow({
+            opportunityId: this.recordId,
+            selectedInventoryIds: this.selectedInventoryIds,
+            paymentMode: this.paymentMode,
+            purpose: this.purpose,
+            amount: this.amount,
+            fieldsJson: JSON.stringify(this.payFields),
+            jointOwnersJson: JSON.stringify(jointOwnerPayload)
+        })
             .then(() => {
                 this.isSaving = false;
-                this.showToast('Success', 'Booking & Payment created successfully', 'success');
+                this.showToast('Success', 'Booking, joint owners, and payment created successfully', 'success');
                 this.dispatchEvent(new CloseActionScreenEvent());
             })
             .catch(error => {
