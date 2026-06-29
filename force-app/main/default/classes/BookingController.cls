@@ -26,7 +26,7 @@ public without sharing class BookingController {
         p.Amount__c        = String.valueOf(amount);
         p.Total_Amount__c  = amount;
         p.TotalAmount__c   = amount;
-        p.PaymentStatus__c = 'Completed';
+        p.PaymentStatus__c = 'Pending';
         p.Date_Acknowledged__c = Date.today();
     
         // ---- mode-specific ----
@@ -274,7 +274,7 @@ public without sharing class BookingController {
             } else {
                 Opportunity newOpp = new Opportunity(
                     Name = sourceOpp.Account.Name + '-' + inv.Name,
-                    StageName = 'Sold',
+                    StageName = 'New',
                     CloseDate = Date.today().addMonths(1),
                     AccountId = sourceOpp.AccountId,
                     Amount = inv.Sale_Price__c
