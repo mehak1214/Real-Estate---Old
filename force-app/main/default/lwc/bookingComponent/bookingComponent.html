@@ -6,68 +6,165 @@
             <div class="progress-bar slds-m-bottom_large">
                 <div class={step1Class}>
                     <div class="circle">1</div>
-                    <span class="step-label">Booking</span>
+                    <span class="step-label">Details</span>
                 </div>
                 <div class="connector"></div>
                 <div class={step2Class}>
                     <div class="circle">2</div>
-                    <span class="step-label">Ownership</span>
+                    <span class="step-label">Booking</span>
                 </div>
                 <div class="connector"></div>
                 <div class={step3Class}>
                     <div class="circle">3</div>
+                    <span class="step-label">Ownership</span>
+                </div>
+                <div class="connector"></div>
+                <div class={step4Class}>
+                    <div class="circle">4</div>
                     <span class="step-label">Payment</span>
                 </div>
             </div>
 
-            <!-- ================= STEP 1 : BOOKING ================= -->
+            <!-- ================= STEP 1 : ACCOUNT & OPPORTUNITY DETAILS ================= -->
             <template if:true={isStep1}>
                 <div class="card-section slds-box slds-theme_shade">
-                    <h3 class="section-title">Select Inventory</h3>
 
-                    <lightning-combobox
-                        class="slds-m-bottom_small"
-                        label="Project"
-                        value={projectId}
-                        options={projectOptions}
-                        onchange={handleProjectChange}
-                        placeholder="Choose a project"
-                        required>
-                    </lightning-combobox>
-
-                    <lightning-combobox
-                        class="slds-m-bottom_small"
-                        label="Property"
-                        value={propertyId}
-                        options={propertyOptions}
-                        onchange={handlePropertyChange}
-                        disabled={isPropertyDisabled}
-                        placeholder="Choose a property"
-                        required>
-                    </lightning-combobox>
-
-                    <lightning-combobox
-                        label="Unit"
-                        value={unitId}
-                        options={unitOptions}
-                        onchange={handleUnitChange}
-                        disabled={isUnitDisabled}
-                        placeholder="Choose a unit"
-                        required>
-                    </lightning-combobox>
-
-                    <!-- Unit summary preview
-                    <template if:true={selectedUnitInfo}>
-                        <div class="unit-preview slds-m-top_medium">
-                            <div class="preview-row">
-                                <span class="preview-key">Unit Cost</span>
-                                <span class="preview-val">{formattedUnitCost}</span>
-                            </div>
+                    <!-- Account Section -->
+                    <h3 class="section-title">Account Information</h3>
+                    <lightning-record-edit-form
+                        object-api-name="Account"
+                        record-id={accountId}
+                        onsuccess={handleAccountSave}
+                        onerror={handleFormError}
+                        data-type="account">
+                        <div class="slds-grid slds-gutters slds-wrap">
+                            <template for:each={accountFields} for:item="field">
+                                <div key={field} class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
+                                    <lightning-input-field field-name={field}></lightning-input-field>
+                                </div>
+                            </template>
                         </div>
-                    </template>  -->
+                    </lightning-record-edit-form>
+
+                    <div class="section-divider slds-m-vertical_medium"></div>
+
+                    <!-- Opportunity Section -->
+                    <h3 class="section-title">Opportunity Information</h3>
+                    <lightning-record-edit-form
+                        object-api-name="Opportunity"
+                        record-id={recordId}
+                        onsuccess={handleOpportunitySave}
+                        onerror={handleFormError}
+                        data-type="opportunity">
+                        <div class="slds-grid slds-gutters slds-wrap">
+                            <template for:each={opportunityFieldObjects} for:item="fieldObj">
+                                <div key={fieldObj.name} class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2 slds-m-bottom_small">
+                                    <lightning-input-field
+                                        field-name={fieldObj.name}
+                                        disabled={fieldObj.disabled}>
+                                    </lightning-input-field>
+                                </div>
+                            </template>
+                        </div>
+                    </lightning-record-edit-form>
+
                 </div>
 
+                <template if:true={isStep1Loading}>
+                    <lightning-spinner alternative-text="Saving..." size="medium"></lightning-spinner>
+                </template>
+
                 <div class="footer-actions slds-m-top_medium">
+                    <lightning-button
+                        label="Save & Continue"
+                        variant="brand"
+                        icon-name="utility:forward"
+                        icon-position="right"
+                        onclick={handleStep1Save}
+                        disabled={isStep1Loading}>
+                    </lightning-button>
+                </div>
+            </template>
+
+            <!-- ================= STEP 2 : BOOKING / INVENTORY ================= -->
+            <template if:true={isStep2}>
+                <div class="card-section slds-box slds-theme_shade">
+
+                    <!-- Sub-view 1: Inventory Selection -->
+                    <template if:true={showInventorySelection}>
+                        <h3 class="section-title">Select Inventory</h3>
+
+                        <template if:true={hasInventoryUnits}>
+                            <lightning-datatable
+                                data-id="inventory-table"
+                                key-field="Id"
+                                data={inventoryUnits}
+                                columns={inventoryColumns}
+                                onrowselection={handleInventoryRowSelection}>
+                            </lightning-datatable>
+                        </template>
+
+                        <template if:true={noInventoryUnitsFound}>
+                            <p>No inventory units found for this opportunity's account.</p>
+                        </template>
+
+                        <template if:true={inventoryError}>
+                            <div class="slds-text-color_error slds-m-top_medium">
+                                An error occurred: {inventoryError.body.message}
+                            </div>
+                        </template>
+
+                        <div class="slds-m-top_medium">
+                            <lightning-button
+                                label="Create Bookings"
+                                variant="brand"
+                                onclick={handleCreateBookings}
+                                disabled={disableCreateBookingsButton}>
+                            </lightning-button>
+                        </div>
+                    </template>
+
+                    <!-- Sub-view 2: Payment Plan Details -->
+                    <template if:false={showInventorySelection}>
+                        <h3 class="section-title">Payment Plan Details</h3>
+
+                        <template if:true={paymentPlanDetails.length}>
+                            <lightning-datatable
+                                key-field="Id"
+                                data={paymentPlanDetails}
+                                columns={paymentPlanColumns}
+                                hide-checkbox-column>
+                            </lightning-datatable>
+                        </template>
+
+                        <template if:true={noPaymentPlansFound}>
+                            <p>No default payment plan details found for the selected inventory.</p>
+                        </template>
+
+                        <div class="slds-m-top_medium">
+                            <lightning-button
+                                label="Back to Inventory Selection"
+                                variant="neutral"
+                                icon-name="utility:back"
+                                onclick={handleBackToInventorySelection}>
+                            </lightning-button>
+                        </div>
+                    </template>
+
+                </div>
+
+                <template if:true={isInventoryLoading}>
+                    <lightning-spinner alternative-text="Loading..." size="medium"></lightning-spinner>
+                </template>
+
+                <div class="footer-actions slds-m-top_medium">
+                    <lightning-button
+                        label="Back"
+                        variant="neutral"
+                        icon-name="utility:back"
+                        onclick={handleBack}
+                        class="slds-m-right_small">
+                    </lightning-button>
                     <lightning-button
                         label="Next"
                         variant="brand"
@@ -78,8 +175,8 @@
                 </div>
             </template>
 
-            <!-- ================= STEP 2 : JOINT OWNER ================= -->
-            <template if:true={isStep2}>
+            <!-- ================= STEP 3 : JOINT OWNER ================= -->
+            <template if:true={isStep3}>
                 <div class="card-section slds-box slds-theme_shade">
                     <div class="joint-owner-header">
                         <h3 class="section-title">Add Joint Owners</h3>
@@ -101,18 +198,86 @@
                         <div key={owner.id} class="joint-owner-section slds-m-top_medium">
                             <div class="slds-grid slds-gutters slds-wrap slds-grid_vertical-align-end">
                                 <div class="slds-col slds-size_1-of-1 slds-large-size_5-of-12">
-                                    <div class="account-picker-wrapper">
-                                        <lightning-record-picker
-                                            label="Account"
-                                            placeholder="Search Accounts..."
-                                            object-api-name="Account"
-                                            value={owner.accountId}
-                                            onchange={handleJointOwnerChange}
+                                    <div class="account-field-header">
+                                        <label class="slds-form-element__label">
+                                            <abbr class="slds-required" title="required">*</abbr> Account
+                                        </label>
+                                        <lightning-button-icon
+                                            icon-name="utility:add"
+                                            alternative-text="New Account"
+                                            title="New Account"
+                                            variant="border-filled"
+                                            size="small"
+                                            class="new-account-icon-btn"
                                             data-index={index}
-                                            data-field="accountId"
-                                            required>
-                                        </lightning-record-picker>
-                                        
+                                            onclick={handleOpenNewAccountModal}>
+                                        </lightning-button-icon>
+                                    </div>
+                                    <!-- Custom Account Lookup -->
+                                    <div class="lookup-container" data-index={index}>
+                                        <template if:false={owner.accountId}>
+                                            <div class="slds-form-element">
+                                                <div class="slds-form-element__control">
+                                                    <div class="slds-input-has-icon slds-input-has-icon_right">
+                                                        <lightning-icon
+                                                            icon-name="utility:search"
+                                                            size="x-small"
+                                                            class="slds-icon slds-input__icon slds-input__icon_right slds-icon-text-default">
+                                                        </lightning-icon>
+                                                        <input
+                                                            type="text"
+                                                            class="slds-input lookup-input"
+                                                            placeholder="Search Accounts..."
+                                                            value={owner.searchTerm}
+                                                            data-index={index}
+                                                            oninput={handleAccountSearch}
+                                                            onfocus={handleAccountSearchFocus}
+                                                            onblur={handleAccountSearchBlur}
+                                                            autocomplete="off" />
+                                                    </div>
+                                                </div>
+                                                <template if:true={owner.showDropdown}>
+                                                    <div class="lookup-dropdown" data-index={index}>
+                                                        <template if:true={owner.isSearching}>
+                                                            <div class="lookup-item lookup-loading">Searching...</div>
+                                                        </template>
+                                                        <template if:false={owner.isSearching}>
+                                                            <template if:true={owner.searchResults.length}>
+                                                                <template for:each={owner.searchResults} for:item="result">
+                                                                    <div
+                                                                        key={result.Id}
+                                                                        class="lookup-item"
+                                                                        data-id={result.Id}
+                                                                        data-name={result.Name}
+                                                                        data-index={index}
+                                                                        onmousedown={handleAccountSelect}>
+                                                                        <lightning-icon icon-name="standard:account" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                                                                        {result.Name}
+                                                                    </div>
+                                                                </template>
+                                                            </template>
+                                                            <template if:false={owner.searchResults.length}>
+                                                                <div class="lookup-item lookup-no-results">No results found</div>
+                                                            </template>
+                                                        </template>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                        <template if:true={owner.accountId}>
+                                            <div class="lookup-pill">
+                                                <lightning-icon icon-name="standard:account" size="x-small" class="slds-m-right_x-small"></lightning-icon>
+                                                <span class="pill-name">{owner.accountName}</span>
+                                                <lightning-button-icon
+                                                    icon-name="utility:close"
+                                                    alternative-text="Remove"
+                                                    variant="bare"
+                                                    size="small"
+                                                    data-index={index}
+                                                    onclick={handleClearAccount}>
+                                                </lightning-button-icon>
+                                            </div>
+                                        </template>
                                     </div>
                                 </div>
                                 <div class="slds-col slds-size_1-of-1 slds-large-size_2-of-12">
@@ -147,14 +312,6 @@
                                     </lightning-button-icon>
                                 </div>
                             </div>
-                            <lightning-button
-                                            label="New Account"
-                                            variant="neutral"
-                                            icon-name="utility:add"
-                                            class="new-account-btn"
-                                            data-index={index}
-                                            onclick={handleOpenNewAccountModal}>
-                                        </lightning-button>
                         </div>
                     </template>
                 </div>
@@ -177,121 +334,110 @@
                 </div>
             </template>
 
-            <!-- ================= STEP 3 : PAYMENT ================= -->
-<template if:true={isStep3}>
-    <div class="card-section slds-box slds-theme_shade">
-        <h3 class="section-title">Payment Details</h3>
+            <!-- ================= STEP 4 : PAYMENT ================= -->
+            <template if:true={isStep4}>
+                <div class="card-section slds-box slds-theme_shade">
+                    <h3 class="section-title">Payment Details</h3>
 
-        <div class="slds-grid slds-gutters slds-wrap">
+                    <div class="slds-grid slds-gutters slds-wrap">
 
-            <!-- Payment Mode -->
-            <div class="slds-col slds-size_1-of-2">
-                <lightning-combobox
-                    label="Payment Mode"
-                    value={paymentMode}
-                    options={paymentModeOptions}
-                    onchange={handlePaymentModeChange}
-                    placeholder="Select mode"
-                    required>
-                </lightning-combobox>
-            </div>
+                        <!-- Payment Mode -->
+                        <div class="slds-col slds-size_1-of-2">
+                            <lightning-combobox
+                                label="Payment Mode"
+                                value={paymentMode}
+                                options={paymentModeOptions}
+                                onchange={handlePaymentModeChange}
+                                placeholder="Select mode"
+                                required>
+                            </lightning-combobox>
+                        </div>
 
-            <!-- Purpose -->
-            <div class="slds-col slds-size_1-of-2">
-                <lightning-combobox
-                    label="Purpose"
-                    value={purpose}
-                    options={purposeOptions}
-                    onchange={handleFieldChange}
-                    data-field="purpose"
-                    placeholder="Select purpose">
-                </lightning-combobox>
-            </div>
+                        <!-- Purpose -->
+                        <div class="slds-col slds-size_1-of-2">
+                            <lightning-combobox
+                                label="Purpose"
+                                value={purpose}
+                                options={purposeOptions}
+                                onchange={handleFieldChange}
+                                data-field="purpose"
+                                placeholder="Select purpose">
+                            </lightning-combobox>
+                        </div>
 
-            <!-- Amount -->
-            <div class="slds-col slds-size_1-of-2 slds-m-top_small">
-                <lightning-input
-                    type="number"
-                    label="Amount"
-                    value={amount}
-                    onchange={handleFieldChange}
-                    data-field="amount"
-                    formatter="currency"
-                    step="0.01"
-                    required>
-                </lightning-input>
-            </div>
+                        <!-- Amount -->
+                        <div class="slds-col slds-size_1-of-2 slds-m-top_small">
+                            <lightning-input
+                                type="number"
+                                label="Amount"
+                                value={amount}
+                                onchange={handleFieldChange}
+                                data-field="amount"
+                                formatter="currency"
+                                step="0.01"
+                                required>
+                            </lightning-input>
+                        </div>
 
-        </div>
-
-        <!-- ===== CHEQUE ONLY ===== -->
-        <template if:true={isCheque}>
-            <div class="mode-section">
-
-                <div class="mode-badge">
-                    Cheque Details
-                </div>
-
-                <div class="slds-grid slds-gutters slds-wrap">
-
-                    <div class="slds-col slds-size_1-of-2">
-                        <lightning-input
-                            label="Cheque Number"
-                            data-field="chequeNumber"
-                            onchange={handleFieldChange}>
-                        </lightning-input>
                     </div>
 
-                    <div class="slds-col slds-size_1-of-2">
-                        <lightning-combobox
-                            label="Bank Name"
-                            value={bankName}
-                            options={bankNameOptions}
-                            data-field="bankName"
-                            onchange={handleFieldChange}>
-                        </lightning-combobox>
-                    </div>
-
-                    <div class="slds-col slds-size_1-of-2 slds-m-top_small">
-                        <lightning-input
-                            label="Branch"
-                            data-field="branch"
-                            onchange={handleFieldChange}>
-                        </lightning-input>
-                    </div>
-
-                    <div class="slds-col slds-size_1-of-2 slds-m-top_small">
-                        <lightning-input
-                            type="date"
-                            label="Cheque Date"
-                            data-field="chequeDate"
-                            onchange={handleFieldChange}>
-                        </lightning-input>
-                    </div>
+                    <!-- ===== CHEQUE ONLY ===== -->
+                    <template if:true={isCheque}>
+                        <div class="mode-section">
+                            <div class="mode-badge">Cheque Details</div>
+                            <div class="slds-grid slds-gutters slds-wrap">
+                                <div class="slds-col slds-size_1-of-2">
+                                    <lightning-input
+                                        label="Cheque Number"
+                                        data-field="chequeNumber"
+                                        onchange={handleFieldChange}>
+                                    </lightning-input>
+                                </div>
+                                <div class="slds-col slds-size_1-of-2">
+                                    <lightning-combobox
+                                        label="Bank Name"
+                                        value={bankName}
+                                        options={bankNameOptions}
+                                        data-field="bankName"
+                                        onchange={handleFieldChange}>
+                                    </lightning-combobox>
+                                </div>
+                                <div class="slds-col slds-size_1-of-2 slds-m-top_small">
+                                    <lightning-input
+                                        label="Branch"
+                                        data-field="branch"
+                                        onchange={handleFieldChange}>
+                                    </lightning-input>
+                                </div>
+                                <div class="slds-col slds-size_1-of-2 slds-m-top_small">
+                                    <lightning-input
+                                        type="date"
+                                        label="Cheque Date"
+                                        data-field="chequeDate"
+                                        onchange={handleFieldChange}>
+                                    </lightning-input>
+                                </div>
+                            </div>
+                        </div>
+                    </template>
 
                 </div>
 
-            </div>
-        </template>
-
-    </div>
-
-    <div class="footer-actions slds-m-top_medium">
-        <lightning-button
-            label="Back"
-            variant="neutral"
-            icon-name="utility:back"
-            onclick={handleBack}
-            class="slds-m-right_small">
-        </lightning-button>
-
-        <lightning-button
-            label="Save"
-            variant="brand"
-            onclick={handleSave}>
-        </lightning-button>
-    </div>
-</template>
+                <div class="footer-actions slds-m-top_medium">
+                    <lightning-button
+                        label="Back"
+                        variant="neutral"
+                        icon-name="utility:back"
+                        onclick={handleBack}
+                        class="slds-m-right_small">
+                    </lightning-button>
+                    <lightning-button
+                        label="Save"
+                        variant="brand"
+                        onclick={handleSave}>
+                    </lightning-button>
+                </div>
+            </template>
 
             <!-- Spinner -->
             <template if:true={isSaving}>
@@ -305,8 +451,6 @@
     <template if:true={showNewAccountModal}>
         <section role="dialog" tabindex="-1" class="slds-modal slds-fade-in-open" aria-modal="true" aria-labelledby="new-account-modal-heading">
             <div class="slds-modal__container">
-
-                <!-- Modal Header -->
                 <header class="slds-modal__header">
                     <lightning-button-icon
                         icon-name="utility:close"
@@ -320,8 +464,6 @@
                         Create New Account
                     </h2>
                 </header>
-
-                <!-- Modal Body -->
                 <div class="slds-modal__content slds-p-around_medium">
                     <div class="slds-grid slds-gutters slds-wrap">
                         <div class="slds-col slds-size_1-of-1 slds-medium-size_1-of-2">
@@ -363,8 +505,6 @@
                         <lightning-spinner alternative-text="Creating account..." size="small"></lightning-spinner>
                     </template>
                 </div>
-
-                <!-- Modal Footer -->
                 <footer class="slds-modal__footer">
                     <lightning-button
                         label="Cancel"
@@ -381,7 +521,6 @@
                         disabled={isCreatingAccount}>
                     </lightning-button>
                 </footer>
-
             </div>
         </section>
         <div class="slds-backdrop slds-backdrop_open"></div>

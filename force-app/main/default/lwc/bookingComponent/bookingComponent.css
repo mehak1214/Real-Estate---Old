@@ -42,10 +42,10 @@
     letter-spacing: .3px;
 }
 .connector {
-    width: 90px;
+    width: 60px;
     height: 3px;
     background: #e5e5e5;
-    margin: 0 10px 22px;
+    margin: 0 6px 22px;
     border-radius: 2px;
 }
 
@@ -62,6 +62,11 @@
     margin-bottom: 14px;
     border-left: 4px solid #1b96ff;
     padding-left: 8px;
+}
+.section-divider {
+    height: 1px;
+    background: #e5e5e5;
+    border-radius: 1px;
 }
 
 /* joint owner */
@@ -114,27 +119,6 @@
     margin-bottom: 14px;
     letter-spacing: .4px;
 }
-.mode-badge.wire { background: #ea7600; }
-.wire-note {
-    font-size: 12px;
-    color: #ea7600;
-    background: #fff5eb;
-    padding: 8px 10px;
-    border-radius: 6px;
-}
-
-/* unit preview */
-.unit-preview {
-    background: #eef6ff;
-    border-radius: 8px;
-    padding: 10px 14px;
-}
-.preview-row {
-    display: flex;
-    justify-content: space-between;
-}
-.preview-key { color: #5c5c5c; font-size: 13px; }
-.preview-val { font-weight: 700; color: #0b5cab; font-size: 14px; }
 
 /* footer */
 .footer-actions {
@@ -142,16 +126,97 @@
     justify-content: flex-end;
 }
 
+/* account field: label row with inline + button */
+.account-field-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+.account-field-header .slds-form-element__label {
+    margin-bottom: 0;
+    font-size: 13px;
+    font-weight: 600;
+    color: #3e3e3c;
+}
+.new-account-icon-btn {
+    flex-shrink: 0;
+}
+
+/* custom account lookup */
+.lookup-container {
+    position: relative;
+}
+.lookup-input {
+    width: 100%;
+    height: 32px;
+    padding: 0 30px 0 10px;
+    border: 1px solid #dddbda;
+    border-radius: 4px;
+    font-size: 13px;
+    background: #fff;
+    color: #3e3e3c;
+    box-sizing: border-box;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.lookup-input:focus {
+    outline: none;
+    border-color: #1b96ff;
+    box-shadow: 0 0 0 3px rgba(27,150,255,.2);
+}
+.lookup-dropdown {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    right: 0;
+    background: #fff;
+    border: 1px solid #dddbda;
+    border-radius: 4px;
+    box-shadow: 0 4px 12px rgba(0,0,0,.15);
+    z-index: 9999;
+    max-height: 200px;
+    overflow-y: auto;
+}
+.lookup-item {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    font-size: 13px;
+    color: #3e3e3c;
+    cursor: pointer;
+    transition: background .1s ease;
+}
+.lookup-item:hover { background: #f3f2f2; }
+.lookup-loading,
+.lookup-no-results {
+    color: #706e6b;
+    cursor: default;
+    font-style: italic;
+}
+.lookup-loading:hover,
+.lookup-no-results:hover { background: #fff; }
+.lookup-pill {
+    display: flex;
+    align-items: center;
+    padding: 4px 8px;
+    background: #f3f2f2;
+    border: 1px solid #dddbda;
+    border-radius: 4px;
+    font-size: 13px;
+    color: #3e3e3c;
+    min-height: 32px;
+}
+.pill-name {
+    flex: 1;
+    font-weight: 500;
+    color: #0b5cab;
+    margin-right: 4px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
 @keyframes fadeIn {
     from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
-}
-/* account picker with inline new-account button */
-.account-picker-wrapper {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-.new-account-btn {
-    align-self: flex-start;
 }

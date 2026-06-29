@@ -7,7 +7,7 @@ public without sharing class BookingController {
     
     @AuraEnabled
     public static PaymentResult createUnitPayment(
-        Id opportunityId, Id unitId, Id projectId,
+        Id opportunityId,
         String paymentMode, String purpose, Decimal amount,
         String fieldsJson
     ){
@@ -19,8 +19,6 @@ public without sharing class BookingController {
     
         // ---- auto-populated context ----
         p.Opportunity__c   = opportunityId;
-        p.Unit__c          = unitId;
-        p.Project__c       = projectId;
         p.OwnerId          = UserInfo.getUserId();
         p.Sales_Consultant__c = UserInfo.getUserId();
         p.Payment_Mode__c  = paymentMode;
@@ -92,6 +90,18 @@ public without sharing class BookingController {
         return String.isBlank(v) ? null : Date.valueOf(v);
     }
     
+    @AuraEnabled(cacheable=true)
+    public static List<Account> searchAccounts(String searchTerm) {
+        String keyword = '%' + String.escapeSingleQuotes(searchTerm.trim()) + '%';
+        return [
+            SELECT Id, Name, Phone
+            FROM Account
+            WHERE Name LIKE :keyword
+            ORDER BY Name
+            LIMIT 10
+        ];
+    }
+
     @AuraEnabled(cacheable=true)
     public static List<Project__c> getProjects(){
         return [SELECT Id, Name FROM Project__c WHERE Active__c = true ORDER BY Name];

@@ -1,10 +1,11 @@
 import { LightningElement, api, wire } from 'lwc';
-import getProjects from '@salesforce/apex/BookingController.getProjects';
-import getProperties from '@salesforce/apex/BookingController.getProperties';
-import getUnits from '@salesforce/apex/BookingController.getUnits';
-import createBookingUnit from '@salesforce/apex/BookingController.createBookingUnit';
+import getInventoryUnits from '@salesforce/apex/SelectUnitScreenController.getUnits';
+import createBookingUnits from '@salesforce/apex/SelectUnitScreenController.createBookingUnits';
+import getPaymentPlanDetails from '@salesforce/apex/SelectUnitScreenController.getPaymentPlanDetails';
 import createUnitPayment from '@salesforce/apex/BookingController.createUnitPayment';
 import createJointOwners from '@salesforce/apex/BookingController.createJointOwners';
+import getAccountAndOpportunity from '@salesforce/apex/BookUnitController.getAccountAndOpportunity';
+import searchAccounts from '@salesforce/apex/BookingController.searchAccounts';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { CloseActionScreenEvent } from 'lightning/actions';
 import { getRecord, getFieldValue, createRecord } from 'lightning/uiRecordApi';
@@ -13,24 +14,51 @@ import ACCOUNT_NAME_FIELD from '@salesforce/schema/Account.Name';
 import ACCOUNT_PHONE_FIELD from '@salesforce/schema/Account.Phone';
 import OPPORTUNITY_NAME from '@salesforce/schema/Opportunity.Name';
 
-const DUMMY_WIRE_URL = 'https://infobeanscloudtechlimited60-dev-ed.develop.my.site.com/paymentgetway';
+const INVENTORY_COLUMNS = [
+    { label: 'Inventory Name', fieldName: 'Name' }
+];
+
+const PAYMENT_PLAN_COLUMNS = [
+    { label: 'Name', fieldName: 'Name' },
+    { label: 'Inventory', fieldName: 'Inventory_Name__c' },
+    { label: 'Sequence No', fieldName: 'Seq__c', type: 'number' },
+    {
+        label: 'Percent',
+        fieldName: 'percentDisplay',
+        type: 'percent',
+        typeAttributes: {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        }
+    },
+    { label: 'Amount', fieldName: 'Amount__c', type: 'currency' }
+];
 
 export default class BookingComponent extends LightningElement {
     @api recordId; // Opportunity Id
 
-    // step control
+    // step control (1=Details, 2=Booking, 3=Ownership, 4=Payment)
     currentStep = 1;
 
-    // booking
-    projectId;
-    propertyId;
-    unitId;
-    projectOptions = [];
-    propertyOptions = [];
-    unitOptions = [];
-    selectedUnitInfo;
-    unitCost;
-    bookingUnitId;
+    // ---- step 1: account & opportunity fields ----
+    accountId;
+    accountFields = [];
+    opportunityFields = [];
+    isStep1Loading = false;
+    accountSaved = false;
+    opportunitySaved = false;
+
+    // booking - inventory selection (Step 2)
+    inventoryUnits = [];
+    inventoryColumns = INVENTORY_COLUMNS;
+    selectedInventoryIds = [];
+    isInventoryLoading = false;
+    inventoryError;
+
+    // booking - payment plan details (shown after Create Bookings)
+    showInventorySelection = true;
+    paymentPlanDetails = [];
+    paymentPlanColumns = PAYMENT_PLAN_COLUMNS;
 
     // joint owners
     jointOwners = [];
@@ -64,49 +92,35 @@ export default class BookingComponent extends LightningElement {
         { label: 'Installment', value: 'Installment' },
         { label: 'Fees', value: 'Fees' }
     ];
-    cardTypeOptions = [
-        { label: 'Visa', value: 'Visa' },
-        { label: 'Mastercard', value: 'Mastercard' },
-        { label: 'Amex', value: 'Amex' }
-    ];
     bankNameOptions = [
         { label: 'Emirates NBD', value: 'Emirates NBD' },
         { label: 'ADCB', value: 'ADCB' },
         { label: 'FAB', value: 'FAB' },
         { label: 'DIB', value: 'DIB' }
     ];
-    chequeStatusOptions = [
-        { label: 'Held', value: 'Held' },
-        { label: 'Deposited', value: 'Deposited' },
-        { label: 'Cleared', value: 'Cleared' },
-        { label: 'Bounced', value: 'Bounced' },
-        { label: 'Returned', value: 'Returned' }
-    ];
-    installmentOptions = [
-        { label: '1', value: '1' },
-        { label: '3', value: '3' },
-        { label: '6', value: '6' },
-        { label: '12', value: '12' }
-    ];
 
     /* ============ STEP GETTERS ============ */
     get isStep1() { return this.currentStep === 1; }
     get isStep2() { return this.currentStep === 2; }
     get isStep3() { return this.currentStep === 3; }
+    get isStep4() { return this.currentStep === 4; }
 
-    get step1Class() {
-        return 'step ' + (this.currentStep >= 1 ? 'active' : '');
-    }
-    get step2Class() {
-        return 'step ' + (this.currentStep >= 2 ? 'active' : '');
-    }
-    get step3Class() {
-        return 'step ' + (this.currentStep >= 3 ? 'active' : '');
-    }
+    get step1Class() { return 'step ' + (this.currentStep >= 1 ? 'active' : ''); }
+    get step2Class() { return 'step ' + (this.currentStep >= 2 ? 'active' : ''); }
+    get step3Class() { return 'step ' + (this.currentStep >= 3 ? 'active' : ''); }
+    get step4Class() { return 'step ' + (this.currentStep >= 4 ? 'active' : ''); }
 
-    get isPropertyDisabled() { return !this.projectId; }
-    get isUnitDisabled() { return !this.propertyId; }
-    get hasJointOwners() { return this.jointOwners.length > 0; }
+    get hasInventoryUnits()   { return this.inventoryUnits.length > 0; }
+    get noInventoryUnitsFound() {
+        return !this.isInventoryLoading && this.inventoryUnits.length === 0 && !this.inventoryError;
+    }
+    get noPaymentPlansFound() {
+        return !this.isInventoryLoading && this.paymentPlanDetails.length === 0;
+    }
+    get disableCreateBookingsButton() {
+        return this.isInventoryLoading || this.selectedInventoryIds.length === 0;
+    }
+    get hasJointOwners()     { return this.jointOwners.length > 0; }
 
     @wire(getRecord, { recordId: '$recordId', fields: [OPPORTUNITY_NAME] })
     opportunity;
@@ -115,70 +129,146 @@ export default class BookingComponent extends LightningElement {
         return getFieldValue(this.opportunity.data, OPPORTUNITY_NAME) || '';
     }
 
-    /* ============ MODE GETTERS ============ */
-    get isCreditCard() { return this.paymentMode === 'Credit Card'; }
-    get isCheque() { return this.paymentMode === 'Cheque'; }
-    get isCash() { return this.paymentMode === 'Cash'; }
-    get isBankTransfer() { return this.paymentMode === 'Bank Transfer'; }
-    get isWireTransfer() { return this.paymentMode === 'Wire Transfer'; }
-
-    // bound to template picklists for value persistence
-    get cardType() { return this.payFields.cardType; }
-    get installments() { return this.payFields.installments; }
-    get bankName() { return this.payFields.bankName; }
-    get chequeStatus() { return this.payFields.chequeStatus; }
-
-    get formattedUnitCost() {
-        if (this.unitCost == null) return '';
-        return new Intl.NumberFormat('en-AE', {
-            style: 'currency', currency: 'AED'
-        }).format(this.unitCost);
-    }
-
-    /* ============ LOAD PROJECTS ============ */
-    @wire(getProjects)
-    wiredProjects({ data, error }) {
+    /* ============ LOAD ACCOUNT & OPPORTUNITY FIELD SETS (STEP 1) ============ */
+    @wire(getAccountAndOpportunity, {
+        opportunityId: '$recordId',
+        accountFieldSet: 'BookUnitAccountFields',
+        opportunityFieldSet: 'Book_Unit_Opp_Fields'
+    })
+    wiredAccountOpp({ data, error }) {
         if (data) {
-            this.projectOptions = data.map(p => ({ label: p.Name, value: p.Id }));
+            this.accountId       = data.accountData?.Id;
+            this.accountFields   = data.accountFields.filter(f => f !== 'Id');
+            this.opportunityFields = data.opportunityFields.filter(f => f !== 'Id');
+            this.loadInventoryUnits();
         } else if (error) {
             console.error(error);
+            this.showToast('Error', 'Failed to load account/opportunity data', 'error');
         }
     }
 
-    handleProjectChange(event) {
-        this.projectId = event.detail.value;
-        this.propertyId = null;
-        this.unitId = null;
-        this.propertyOptions = [];
-        this.unitOptions = [];
-        this.selectedUnitInfo = null;
-        getProperties({ projectId: this.projectId })
-            .then(result => {
-                this.propertyOptions = result.map(p => ({ label: p.Name, value: p.Id }));
-            })
-            .catch(error => console.error(error));
+    get opportunityFieldObjects() {
+        return this.opportunityFields.map(f => ({
+            name: f,
+            disabled: f === 'AccountId'
+        }));
     }
 
-    handlePropertyChange(event) {
-        this.propertyId = event.detail.value;
-        this.unitId = null;
-        this.unitOptions = [];
-        this.selectedUnitInfo = null;
-        getUnits({ propertyId: this.propertyId })
-            .then(result => {
-                this._units = result;
-                this.unitOptions = result.map(u => ({ label: u.Name, value: u.Id }));
-            })
-            .catch(error => console.error(error));
+    /* ============ STEP 1 SAVE ============ */
+    handleStep1Save() {
+        this.isStep1Loading = true;
+        this.accountSaved = false;
+        this.opportunitySaved = false;
+
+        const accountForm = this.template.querySelector('lightning-record-edit-form[data-type="account"]');
+        const oppForm     = this.template.querySelector('lightning-record-edit-form[data-type="opportunity"]');
+
+        if (accountForm) accountForm.submit();
+        if (oppForm)     oppForm.submit();
     }
 
-    handleUnitChange(event) {
-        this.unitId = event.detail.value;
-        const u = (this._units || []).find(x => x.Id === this.unitId);
-        if (u) {
-            this.selectedUnitInfo = true;
-            this.unitCost = u.Unit_Cost__c;
+    handleAccountSave() {
+        this.accountSaved = true;
+        this.checkStep1AllSaved();
+    }
+
+    handleOpportunitySave() {
+        this.opportunitySaved = true;
+        this.checkStep1AllSaved();
+    }
+
+    checkStep1AllSaved() {
+        if (this.accountSaved && this.opportunitySaved) {
+            this.isStep1Loading = false;
+            this.showToast('Success', 'Account and Opportunity saved successfully!', 'success');
+            this.currentStep = 2;
         }
+    }
+
+    handleFormError(event) {
+        this.isStep1Loading = false;
+        const message = event.detail?.detail || 'Unknown error';
+        this.showToast('Error', 'Error saving records: ' + message, 'error');
+    }
+
+    /* ============ MODE GETTERS ============ */
+    get isCheque()       { return this.paymentMode === 'Cheque'; }
+    get bankName()       { return this.payFields.bankName; }
+
+    /* ============ LOAD INVENTORY UNITS (STEP 2) ============ */
+    loadInventoryUnits() {
+        if (!this.accountId) {
+            this.inventoryUnits = [];
+            return;
+        }
+        this.isInventoryLoading = true;
+        this.inventoryError = undefined;
+
+        getInventoryUnits({ accountId: this.accountId })
+            .then(data => {
+                this.inventoryUnits = data;
+                this.inventoryError = undefined;
+            })
+            .catch(error => {
+                this.inventoryError = error;
+                this.inventoryUnits = [];
+                const msg = error?.body?.message || 'Failed to load inventory units';
+                this.showToast('Error Loading Units', msg, 'error');
+            })
+            .finally(() => {
+                this.isInventoryLoading = false;
+            });
+    }
+
+    handleInventoryRowSelection(event) {
+        const selectedRows = event.detail?.selectedRows || [];
+        if (selectedRows.length > 10) {
+            this.showToast('Selection Limit Exceeded', 'You can only select a maximum of 10 units at a time.', 'error');
+
+            // Revert selection in the datatable UI
+            const datatable = this.template.querySelector('lightning-datatable[data-id="inventory-table"]');
+            if (datatable) datatable.selectedRows = [...this.selectedInventoryIds];
+
+            return;
+        }
+        this.selectedInventoryIds = selectedRows.map(row => row.Id);
+    }
+
+    handleCreateBookings() {
+        if (this.selectedInventoryIds.length === 0) {
+            this.showToast('Warning', 'Please select at least one inventory unit.', 'warning');
+            return;
+        }
+
+        this.isInventoryLoading = true;
+        this.inventoryError = undefined;
+
+        createBookingUnits({
+            opportunityId: this.recordId,
+            selectedInventoryIds: this.selectedInventoryIds
+        })
+            .then(result => {
+                this.showToast('Success', result, 'success');
+                return getPaymentPlanDetails({ selectedInventoryIds: this.selectedInventoryIds });
+            })
+            .then(ppdResult => {
+                this.paymentPlanDetails = ppdResult.map(row => ({
+                    ...row,
+                    percentDisplay: row.Percent__c / 100
+                }));
+                this.showInventorySelection = false;
+                this.isInventoryLoading = false;
+            })
+            .catch(error => {
+                this.isInventoryLoading = false;
+                this.inventoryError = error;
+                const msg = error?.body?.message || 'Something went wrong while creating bookings';
+                this.showToast('Error', msg, 'error');
+            });
+    }
+
+    handleBackToInventorySelection() {
+        this.showInventorySelection = true;
     }
 
     /* ============ JOINT OWNER HANDLERS ============ */
@@ -188,6 +278,12 @@ export default class BookingComponent extends LightningElement {
             {
                 id: this.nextJointOwnerId++,
                 accountId: null,
+                accountName: '',
+                searchTerm: '',
+                searchResults: [],
+                showDropdown: false,
+                isSearching: false,
+                _searchTimer: null,
                 share: null
             }
         ];
@@ -196,8 +292,7 @@ export default class BookingComponent extends LightningElement {
     handleJointOwnerChange(event) {
         const index = Number(event.currentTarget.dataset.index);
         const field = event.currentTarget.dataset.field;
-        const value = field === 'accountId' ? event.detail.recordId : event.detail.value;
-
+        const value = event.detail.value;
         this.jointOwners = this.jointOwners.map((owner, ownerIndex) =>
             ownerIndex === index ? { ...owner, [field]: value } : owner
         );
@@ -206,6 +301,78 @@ export default class BookingComponent extends LightningElement {
     handleRemoveJointOwner(event) {
         const ownerId = Number(event.currentTarget.dataset.id);
         this.jointOwners = this.jointOwners.filter(owner => owner.id !== ownerId);
+    }
+
+    /* ---- custom account lookup ---- */
+    handleAccountSearch(event) {
+        const index = Number(event.currentTarget.dataset.index);
+        const term = event.target.value;
+
+        this.jointOwners = this.jointOwners.map((o, i) =>
+            i === index ? { ...o, searchTerm: term, showDropdown: true, isSearching: true, searchResults: [] } : o
+        );
+
+        const owner = this.jointOwners[index];
+        if (owner._searchTimer) clearTimeout(owner._searchTimer);
+
+        const timer = setTimeout(() => {
+            if (!term || term.trim().length < 1) {
+                this.jointOwners = this.jointOwners.map((o, i) =>
+                    i === index ? { ...o, isSearching: false, searchResults: [], showDropdown: false } : o
+                );
+                return;
+            }
+            searchAccounts({ searchTerm: term })
+                .then(results => {
+                    this.jointOwners = this.jointOwners.map((o, i) =>
+                        i === index ? { ...o, searchResults: results, isSearching: false, showDropdown: true } : o
+                    );
+                })
+                .catch(() => {
+                    this.jointOwners = this.jointOwners.map((o, i) =>
+                        i === index ? { ...o, isSearching: false, searchResults: [] } : o
+                    );
+                });
+        }, 300);
+
+        this.jointOwners = this.jointOwners.map((o, i) =>
+            i === index ? { ...o, _searchTimer: timer } : o
+        );
+    }
+
+    handleAccountSearchFocus(event) {
+        const index = Number(event.currentTarget.dataset.index);
+        const owner = this.jointOwners[index];
+        if (owner.searchResults && owner.searchResults.length > 0) {
+            this.jointOwners = this.jointOwners.map((o, i) =>
+                i === index ? { ...o, showDropdown: true } : o
+            );
+        }
+    }
+
+    handleAccountSearchBlur(event) {
+        const index = Number(event.currentTarget.dataset.index);
+        setTimeout(() => {
+            this.jointOwners = this.jointOwners.map((o, i) =>
+                i === index ? { ...o, showDropdown: false } : o
+            );
+        }, 200);
+    }
+
+    handleAccountSelect(event) {
+        const index = Number(event.currentTarget.dataset.index);
+        const id   = event.currentTarget.dataset.id;
+        const name = event.currentTarget.dataset.name;
+        this.jointOwners = this.jointOwners.map((o, i) =>
+            i === index ? { ...o, accountId: id, accountName: name, searchTerm: '', searchResults: [], showDropdown: false } : o
+        );
+    }
+
+    handleClearAccount(event) {
+        const index = Number(event.currentTarget.dataset.index);
+        this.jointOwners = this.jointOwners.map((o, i) =>
+            i === index ? { ...o, accountId: null, accountName: '', searchTerm: '', searchResults: [], showDropdown: false } : o
+        );
     }
 
     /* ============ NEW ACCOUNT MODAL HANDLERS ============ */
@@ -227,12 +394,11 @@ export default class BookingComponent extends LightningElement {
     }
 
     handleCreateNewAccount() {
-        const { firstName, lastName, phone, email } = this.newAccount;
+        const { firstName, lastName, phone } = this.newAccount;
         if (!lastName || !lastName.trim()) {
             this.showToast('Error', 'Last Name is required to create an Account', 'error');
             return;
         }
-
         this.isCreatingAccount = true;
 
         const fullName = firstName ? `${firstName.trim()} ${lastName.trim()}` : lastName.trim();
@@ -243,13 +409,12 @@ export default class BookingComponent extends LightningElement {
         createRecord({ apiName: ACCOUNT_OBJECT.objectApiName, fields })
             .then(account => {
                 const newId = account.id;
-                const idx = this.newAccountOwnerIndex;
-
-                // Auto-select the newly created account in the correct owner row
+                const idx   = this.newAccountOwnerIndex;
                 this.jointOwners = this.jointOwners.map((owner, ownerIndex) =>
-                    ownerIndex === idx ? { ...owner, accountId: newId } : owner
+                    ownerIndex === idx
+                        ? { ...owner, accountId: newId, accountName: fullName, searchTerm: '', searchResults: [], showDropdown: false }
+                        : owner
                 );
-
                 this.isCreatingAccount = false;
                 this.showNewAccountModal = false;
                 this.newAccountOwnerIndex = null;
@@ -264,12 +429,12 @@ export default class BookingComponent extends LightningElement {
 
     /* ============ STEP NAV ============ */
     handleNext() {
-        if (this.currentStep === 1) {
-            if (!this.projectId || !this.propertyId || !this.unitId) {
-                this.showToast('Error', 'Please select Project, Property and Unit', 'error');
+        if (this.currentStep === 2) {
+            if (this.selectedInventoryIds.length === 0 || this.showInventorySelection) {
+                this.showToast('Error', 'Please select inventory unit(s) and click Create Bookings before continuing', 'error');
                 return;
             }
-        } else if (this.currentStep === 2) {
+        } else if (this.currentStep === 3) {
             for (let i = 0; i < this.jointOwners.length; i++) {
                 const owner = this.jointOwners[i];
                 const share = Number(owner.share);
@@ -286,6 +451,7 @@ export default class BookingComponent extends LightningElement {
         }
         this.currentStep++;
     }
+
     handleBack() {
         this.currentStep--;
     }
@@ -293,7 +459,6 @@ export default class BookingComponent extends LightningElement {
     /* ============ PAYMENT FIELD HANDLERS ============ */
     handlePaymentModeChange(event) {
         this.paymentMode = event.detail.value;
-        // clear mode-specific fields when switching
         this.payFields = {};
     }
 
@@ -317,51 +482,38 @@ export default class BookingComponent extends LightningElement {
         }
         this.isSaving = true;
 
-        createBookingUnit({
-            opportunityId: this.recordId,
-            projectId: this.projectId,
-            propertyId: this.propertyId,
-            unitId: this.unitId
-        })
-        .then(bookingId => {
-            this.bookingUnitId = bookingId;
-            const jointOwnerPayload = this.jointOwners.map(owner => ({
-                Account__c: owner.accountId,
-                Share__c: Number(owner.share),
-                Booking__c: this.recordId,
-                Booking_Unit__c: this.bookingUnitId
-            }));
+        const jointOwnerPayload = this.jointOwners.map(owner => ({
+            Account__c:     owner.accountId,
+            Share__c:       Number(owner.share),
+            Booking__c:     this.recordId
+        }));
 
-            const promises = [
-                createUnitPayment({
-                    opportunityId: this.recordId,
-                    unitId: this.unitId,
-                    projectId: this.projectId,
-                    paymentMode: this.paymentMode,
-                    purpose: this.purpose,
-                    amount: this.amount,
-                    fieldsJson: JSON.stringify(this.payFields)
-                })
-            ];
+        const promises = [
+            createUnitPayment({
+                opportunityId: this.recordId,
+                paymentMode:   this.paymentMode,
+                purpose:       this.purpose,
+                amount:        this.amount,
+                fieldsJson:    JSON.stringify(this.payFields)
+            })
+        ];
 
-            if (jointOwnerPayload.length > 0) {
-                promises.push(createJointOwners({ jointOwners: jointOwnerPayload }));
-            }
+        if (jointOwnerPayload.length > 0) {
+            promises.push(createJointOwners({ jointOwners: jointOwnerPayload }));
+        }
 
-            return Promise.all(promises);
-        })
-        .then(([paymentResult]) => {
-            this.isSaving = false;
-            this.showToast('Success', 'Booking & Payment created successfully', 'success');
-
-            this.dispatchEvent(new CloseActionScreenEvent());
-        })
-        .catch(error => {
-            this.isSaving = false;
-            console.error(error);
-            const msg = error?.body?.message || 'Something went wrong';
-            this.showToast('Error', msg, 'error');
-        });
+        Promise.all(promises)
+            .then(() => {
+                this.isSaving = false;
+                this.showToast('Success', 'Booking & Payment created successfully', 'success');
+                this.dispatchEvent(new CloseActionScreenEvent());
+            })
+            .catch(error => {
+                this.isSaving = false;
+                console.error(error);
+                const msg = error?.body?.message || 'Something went wrong';
+                this.showToast('Error', msg, 'error');
+            });
     }
 
     showToast(title, message, variant) {
