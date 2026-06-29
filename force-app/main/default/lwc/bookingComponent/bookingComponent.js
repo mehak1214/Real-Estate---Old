@@ -7,7 +7,10 @@ import createUnitPayment from '@salesforce/apex/BookingController.createUnitPaym
 import createJointOwners from '@salesforce/apex/BookingController.createJointOwners';
 import { ShowToastEvent } from 'lightning/platformShowToastEvent';
 import { CloseActionScreenEvent } from 'lightning/actions';
-import { getRecord, getFieldValue } from 'lightning/uiRecordApi';
+import { getRecord, getFieldValue, createRecord } from 'lightning/uiRecordApi';
+import ACCOUNT_OBJECT from '@salesforce/schema/Account';
+import ACCOUNT_NAME_FIELD from '@salesforce/schema/Account.Name';
+import ACCOUNT_PHONE_FIELD from '@salesforce/schema/Account.Phone';
 import OPPORTUNITY_NAME from '@salesforce/schema/Opportunity.Name';
 
 const DUMMY_WIRE_URL = 'https://infobeanscloudtechlimited60-dev-ed.develop.my.site.com/paymentgetway';
@@ -32,6 +35,12 @@ export default class BookingComponent extends LightningElement {
     // joint owners
     jointOwners = [];
     nextJointOwnerId = 1;
+
+    // new account modal
+    showNewAccountModal = false;
+    isCreatingAccount = false;
+    newAccountOwnerIndex = null;
+    newAccount = { firstName: '', lastName: '', phone: '', email: '' };
 
     // payment
     paymentMode;
@@ -197,6 +206,60 @@ export default class BookingComponent extends LightningElement {
     handleRemoveJointOwner(event) {
         const ownerId = Number(event.currentTarget.dataset.id);
         this.jointOwners = this.jointOwners.filter(owner => owner.id !== ownerId);
+    }
+
+    /* ============ NEW ACCOUNT MODAL HANDLERS ============ */
+    handleOpenNewAccountModal(event) {
+        this.newAccountOwnerIndex = Number(event.currentTarget.dataset.index);
+        this.newAccount = { firstName: '', lastName: '', phone: '', email: '' };
+        this.showNewAccountModal = true;
+    }
+
+    handleCloseNewAccountModal() {
+        this.showNewAccountModal = false;
+        this.newAccountOwnerIndex = null;
+        this.isCreatingAccount = false;
+    }
+
+    handleNewAccountFieldChange(event) {
+        const field = event.target.dataset.field;
+        this.newAccount = { ...this.newAccount, [field]: event.detail.value };
+    }
+
+    handleCreateNewAccount() {
+        const { firstName, lastName, phone, email } = this.newAccount;
+        if (!lastName || !lastName.trim()) {
+            this.showToast('Error', 'Last Name is required to create an Account', 'error');
+            return;
+        }
+
+        this.isCreatingAccount = true;
+
+        const fullName = firstName ? `${firstName.trim()} ${lastName.trim()}` : lastName.trim();
+        const fields = {};
+        fields[ACCOUNT_NAME_FIELD.fieldApiName] = fullName;
+        if (phone) fields[ACCOUNT_PHONE_FIELD.fieldApiName] = phone;
+
+        createRecord({ apiName: ACCOUNT_OBJECT.objectApiName, fields })
+            .then(account => {
+                const newId = account.id;
+                const idx = this.newAccountOwnerIndex;
+
+                // Auto-select the newly created account in the correct owner row
+                this.jointOwners = this.jointOwners.map((owner, ownerIndex) =>
+                    ownerIndex === idx ? { ...owner, accountId: newId } : owner
+                );
+
+                this.isCreatingAccount = false;
+                this.showNewAccountModal = false;
+                this.newAccountOwnerIndex = null;
+                this.showToast('Success', `Account "${fullName}" created and selected`, 'success');
+            })
+            .catch(error => {
+                this.isCreatingAccount = false;
+                const msg = error?.body?.message || 'Failed to create Account';
+                this.showToast('Error', msg, 'error');
+            });
     }
 
     /* ============ STEP NAV ============ */
